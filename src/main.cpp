@@ -48,11 +48,12 @@ float* save_filtered_altitude();
 float velocity_checker();
 int stateMachine();
 void SD_Setup();
+void writeToFile();
 
 float groundPressure;
 
 int i = 0;
-int altitude_index = i % FLINTERING_SIZE; 
+int altitude_index; 
 int state = 0;
 float altitude_array[FLINTERING_SIZE];
 float filtered_altitude_array[FLINTERING_SIZE];
@@ -101,14 +102,15 @@ void loop() {
     Serial.print(altitude); /* Adjusted to local forecast! */
     Serial.println(" m");
 
-
+    altitude_index = i % FLINTERING_SIZE; 
     i++;
     save_raw_altitude();
     altitude_filter();
     save_filtered_altitude();
     velocity_checker();
-    stateMachine();
+    state = stateMachine();
     Serial.println();
+    writeToFile();
 
     delay(100);
 
@@ -201,6 +203,7 @@ int stateMachine() {
       return state;
     }    
   }
+  
   //apogee = 2
   while (state == 2){
     // drogue, or main parachuate ejection
@@ -234,6 +237,7 @@ int stateMachine() {
 // SDcard setting
 
 void SD_Setup(){
+  Serial.begin(115200);
   SD.begin(SD_CARD_CS);
     Serial.print("Initializing SD card...");
   if (!SD.begin(SD_CARD_CS)) {
@@ -252,8 +256,8 @@ void SD_Setup(){
   myFile.println("testing 1, 2, 3.");
 
   // close the file:
-  myFile.close();
-  Serial.println("done.");
+  // myFile.close();
+  // Serial.println("done.");
 
   } else {
   // if the file didn't open, print an error:
@@ -262,21 +266,59 @@ void SD_Setup(){
 
 
   // re-open the file for reading:
-  myFile = SD.open("test.txt");
-  if (myFile) {
-    Serial.println("test.txt:");
+  // myFile = SD.open("test.txt");
+  // if (myFile) {
+  //   Serial.println("test.txt:");
    // read from the file until there's nothing else in it:
-    while (myFile.available()) {
-      Serial.write(myFile.read());
-    }
+    // while (myFile.available()) {
+    //   Serial.write(myFile.read());
+    // }
     // close the file:
-    myFile.close();
-  } else {
-    // if the file didn't open, print an error:
-    Serial.println("error opening test.txt");
-  }
+    // myFile.close();
+  // } else {
+  //   // if the file didn't open, print an error:
+  //   Serial.println("error opening test.txt");
+  // }
 }
 
+
+void writeToFile() {
+  Serial.begin(115200);
+  myFile = SD.open("test.txt", FILE_WRITE);
+  if (myFile) // it opened OK
+    {
+    Serial.println("Writing to simple.txt");
+    myFile.print(F("state = "));
+    myFile.print(state);
+
+    myFile.print(F("  / Micro = "));
+    myFile.print(millis());
+    myFile.print(" mSec    ");
+
+    myFile.print(F("/ Temperature = "));
+    myFile.print(bmp.readTemperature());
+    myFile.print(" *C    ");
+
+    myFile.print(F("/Pressure = "));
+    myFile.print(bmp.readPressure());
+    myFile.print(" Pa    ");
+
+    myFile.print(F("/ raw altitude = "));
+    myFile.print(raw_altitude); /* Adjusted to local forecast! */
+    myFile.println(" m");
+
+    myFile.print(F("/ filtered altitude = "));
+    myFile.print(altitude); /* Adjusted to local forecast! */
+    myFile.println(" m");
+
+    // myFile.println("1");
+    // myFile.println(pangram_2);
+    // myFile.println(pangram_3);
+    myFile.close(); 
+    }
+  else 
+    Serial.println("Error opening simple.txt");
+}
 
 
 /*
