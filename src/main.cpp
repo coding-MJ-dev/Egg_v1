@@ -47,7 +47,9 @@ float altitude_filter();
 float* save_filtered_altitude();
 float velocity_checker();
 int stateMachine();
+void SD_Setup();
 
+float groundPressure;
 
 int i = 0;
 int altitude_index = i % FLINTERING_SIZE; 
@@ -55,17 +57,19 @@ int state = 0;
 float altitude_array[FLINTERING_SIZE];
 float filtered_altitude_array[FLINTERING_SIZE];
 float velocity;
-float groundPressure;
+
+float raw_altitude;
 float altitude;
-float filter_altitude;
+
+size_t enterApogee; // millis at change to apogee state
+
+// float temperature = bmp.readTemperature();
+// float pressure = bmp.readPressure();
 
 void setup() {
   altimeter();
+  SD_Setup();
 }
-
-float previousPressure = 0.0;
-float currentPressure = 0.0;
-
 
 
 void loop() {
@@ -90,11 +94,11 @@ void loop() {
     Serial.print(" Pa    ");
 
     Serial.print(F("/ raw altitude = "));
-    Serial.print(altitude); /* Adjusted to local forecast! */
+    Serial.print(raw_altitude); /* Adjusted to local forecast! */
     Serial.println(" m");
 
     Serial.print(F("/ filtered altitude = "));
-    Serial.print(filter_altitude); /* Adjusted to local forecast! */
+    Serial.print(altitude); /* Adjusted to local forecast! */
     Serial.println(" m");
 
 
@@ -134,13 +138,11 @@ void altimeter() {
                   Adafruit_BMP280::STANDBY_MS_500); /* Standby time. */
 
   groundPressure = (bmp.readPressure() / (100));
-  // altitude = bmp.readAltitude(groundPressure);
-
 }
 
 float* save_raw_altitude() {
-  altitude = bmp.readAltitude(groundPressure);
-  altitude_array[altitude_index] = altitude;
+  raw_altitude = bmp.readAltitude(groundPressure);
+  altitude_array[altitude_index] = raw_altitude;
   return altitude_array;
 }
 
@@ -149,8 +151,8 @@ float altitude_filter() {
   for (int n = 0; n < FLINTERING_SIZE ; n++) {
     sum_altitude += altitude_array[n];
   }
-  filter_altitude = sum_altitude / FLINTERING_SIZE;
-  return filter_altitude;
+  altitude = sum_altitude / FLINTERING_SIZE;
+  return altitude;
 }
 
 float* save_filtered_altitude() {
@@ -163,11 +165,15 @@ float velocity_checker() {
   return velocity;
 }
 
-
 /*
 0 = idle = altitude less than 30 m
-1 = ascending = velocity > 5 m/s
-2 = apogee = 5 sec 
+1
+int stateMachine()
+{
+return 0;
+}
+ = ascending = velocity > 5 m/s
+2 = apogee = 5 sec
 3 = descending = velocity < -5 m/s
 4 = landed = altitude less than 30 m
 
@@ -178,8 +184,7 @@ int stateMachine() {
 
   //idle = 0
   while (state == 0){
-    float current_altitude = altitude_filter();
-    if (current_altitude > 30.0) {
+    if (altitude > 30.0) {
       state++;
     }
     else {
@@ -188,8 +193,9 @@ int stateMachine() {
   }
   //ascending = 1
   while (state == 1){
-    if (velocity_checker() < 5.0) {
+    if (velocity < 5.0) {
       state++;
+      enterApogee = millis();
     }
     else {
       return state;
@@ -198,9 +204,8 @@ int stateMachine() {
   //apogee = 2
   while (state == 2){
     // drogue, or main parachuate ejection
-    size_t oldTime = 0;
-    size_t newTime = millis();
-    if (newTime > oldTime + APOGEE_DURATION) {
+    size_t maintainApogee = millis();
+    if (maintainApogee > enterApogee + APOGEE_DURATION) {
       state++;
     }
     else {
@@ -210,7 +215,7 @@ int stateMachine() {
 
   //descending = 3
   while (state == 3){
-    if (altitude_filter() < 30) {
+    if (altitude < 30.0) {
       state++;
     }
     else {
@@ -219,10 +224,14 @@ int stateMachine() {
   }
   //landed = 4
   if (state == 4){
-    //rocket is landed. Please save the data
+    //rocket is landed
     return state;
   }
 }
+
+
+
+// SDcard setting
 
 void SD_Setup(){
   SD.begin(SD_CARD_CS);
