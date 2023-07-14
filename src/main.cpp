@@ -1,7 +1,10 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <MS5607.h>
-#include <iostream>
+//#include <iostream>
+#include <SPI.h>
+#include <SD.h>
+
 
 /***************************************************************************
   This is a library for the BMP280 humidity, temperature & pressure sensor
@@ -26,6 +29,13 @@
 #define BMP_MISO (12)
 #define BMP_MOSI (11)
 #define BMP_CS   (10)
+#define SD_CARD_CS 9
+
+// CHECK before Launch !!!
+#define FLINTERING_SIZE 10
+#define APOGEE_DURATION 4000
+
+File myFile;
 
 Adafruit_BMP280 bmp; // I2C
 //Adafruit_BMP280 bmp(BMP_CS); // hardware SPI
@@ -33,21 +43,21 @@ Adafruit_BMP280 bmp; // I2C
 
 void altimeter();
 float* save_raw_altitude();
-float filtered_altitude();
+float altitude_filter();
 float* save_filtered_altitude();
 float velocity_checker();
 int stateMachine();
 
-/// @brief 
+
 int i = 0;
-int altitude_index = 0; 
+int altitude_index = i % FLINTERING_SIZE; 
 int state = 0;
-float altitude_array[10];
-float avarage_altitude_array[10];
-float velocity = 0.0;
+float altitude_array[FLINTERING_SIZE];
+float filtered_altitude_array[FLINTERING_SIZE];
+float velocity;
 float groundPressure;
 float altitude;
-float avarage_altitude;
+float filter_altitude;
 
 void setup() {
   altimeter();
@@ -56,7 +66,7 @@ void setup() {
 float previousPressure = 0.0;
 float currentPressure = 0.0;
 
-// float comparisonPressure = {previousPressure, currentPressure};
+
 
 void loop() {
   // must call this to wake sensor up and get new measurement data
@@ -65,39 +75,38 @@ void loop() {
     // can now print out the new measurements
 
     Serial.print(F("state = "));
-    Serial.println(state);
+    Serial.print(state);
 
-    Serial.print(F("Micro = "));
+    Serial.print(F("  / Micro = "));
     Serial.print(millis());
-    Serial.println(" mSec");
+    Serial.print(" mSec    ");
 
-    Serial.print(F("Temperature = "));
+    Serial.print(F("/ Temperature = "));
     Serial.print(bmp.readTemperature());
-    Serial.println(" *C");
+    Serial.print(" *C    ");
 
-    Serial.print(F("Pressure = "));
+    Serial.print(F("/Pressure = "));
     Serial.print(bmp.readPressure());
-    Serial.println(" Pa");
+    Serial.print(" Pa    ");
 
-    Serial.print(F("Approx altitude = "));
-    
-    altitude = bmp.readAltitude(groundPressure);
+    Serial.print(F("/ raw altitude = "));
     Serial.print(altitude); /* Adjusted to local forecast! */
+    Serial.println(" m");
+
+    Serial.print(F("/ filtered altitude = "));
+    Serial.print(filter_altitude); /* Adjusted to local forecast! */
     Serial.println(" m");
 
 
     i++;
     save_raw_altitude();
-    filtered_altitude();
-    Serial.println(avarage_altitude);
-
-
+    altitude_filter();
     save_filtered_altitude();
     velocity_checker();
     stateMachine();
     Serial.println();
 
-    delay(2000);
+    delay(100);
 
   } else {
     Serial.println("Forced measurement failed!");
@@ -125,37 +134,35 @@ void altimeter() {
                   Adafruit_BMP280::STANDBY_MS_500); /* Standby time. */
 
   groundPressure = (bmp.readPressure() / (100));
+  // altitude = bmp.readAltitude(groundPressure);
 
 }
 
 float* save_raw_altitude() {
-  altitude_index = i % 10;
-  altitude_array[altitude_index] = Altitude;
+  altitude = bmp.readAltitude(groundPressure);
+  altitude_array[altitude_index] = altitude;
   return altitude_array;
 }
 
-float filtered_altitude() {
-  float avarage_altitude = 0;
-
-  for (int n = 0; n < 10 ; n++)
-  {
-    avarage_altitude += altitude_array[n];
+float altitude_filter() {
+  float sum_altitude = 0;
+  for (int n = 0; n < FLINTERING_SIZE ; n++) {
+    sum_altitude += altitude_array[n];
   }
-  avarage_altitude = avarage_altitude / 10;
-  return avarage_altitude;
+  filter_altitude = sum_altitude / FLINTERING_SIZE;
+  return filter_altitude;
 }
 
 float* save_filtered_altitude() {
-  altitude_index = altitude_index % 10;
-  avarage_altitude_array[altitude_index] = filtered_altitude();
-  return avarage_altitude_array;
+  filtered_altitude_array[altitude_index] = altitude_filter();
+  return filtered_altitude_array;
 }
 
 float velocity_checker() {
-  altitude_index = altitude_index % 10;
-  velocity = ((avarage_altitude_array[altitude_index] - avarage_altitude_array[(altitude_index + 1) % 10]) * -1);
+  velocity = ((filtered_altitude_array[altitude_index] - filtered_altitude_array[(altitude_index - 1 + FLINTERING_SIZE) % 10]));
   return velocity;
 }
+
 
 /*
 0 = idle = altitude less than 30 m
@@ -171,7 +178,7 @@ int stateMachine() {
 
   //idle = 0
   while (state == 0){
-    float current_altitude = filtered_altitude();
+    float current_altitude = altitude_filter();
     if (current_altitude > 30.0) {
       state++;
     }
@@ -190,12 +197,20 @@ int stateMachine() {
   }
   //apogee = 2
   while (state == 2){
-    delay(4000);
-    state++;
-  }    
+    // drogue, or main parachuate ejection
+    size_t oldTime = 0;
+    size_t newTime = millis();
+    if (newTime > oldTime + APOGEE_DURATION) {
+      state++;
+    }
+    else {
+      return state;
+    }
+  }
+
   //descending = 3
   while (state == 3){
-    if (filtered_altitude() < 30) {
+    if (altitude_filter() < 30) {
       state++;
     }
     else {
@@ -207,10 +222,51 @@ int stateMachine() {
     //rocket is landed. Please save the data
     return state;
   }
-
 }
 
+void SD_Setup(){
+  SD.begin(SD_CARD_CS);
+    Serial.print("Initializing SD card...");
+  if (!SD.begin(SD_CARD_CS)) {
+    Serial.println("SD initialization failed!");
+    while (1);
+  }
+  Serial.println("SD card initialised.");
 
+// open the file. note that only one file can be open at a time,
+  // so you have to close this one before opening another.
+  myFile = SD.open("test.txt", FILE_WRITE);
+  // if the file opened okay, write to it:
+
+  if (myFile) {
+  Serial.print("Writing to test.txt...");
+  myFile.println("testing 1, 2, 3.");
+
+  // close the file:
+  myFile.close();
+  Serial.println("done.");
+
+  } else {
+  // if the file didn't open, print an error:
+  Serial.println("error opening test.txt");
+  }
+
+
+  // re-open the file for reading:
+  myFile = SD.open("test.txt");
+  if (myFile) {
+    Serial.println("test.txt:");
+   // read from the file until there's nothing else in it:
+    while (myFile.available()) {
+      Serial.write(myFile.read());
+    }
+    // close the file:
+    myFile.close();
+  } else {
+    // if the file didn't open, print an error:
+    Serial.println("error opening test.txt");
+  }
+}
 
 
 
