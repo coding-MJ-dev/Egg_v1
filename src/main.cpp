@@ -6,6 +6,7 @@
 #include <SD.h>
 
 
+
 /***************************************************************************
   This is a library for the BMP280 humidity, temperature & pressure sensor
 
@@ -35,6 +36,8 @@
 #define FLINTERING_SIZE 10
 #define APOGEE_DURATION 4000
 
+// SD card file name
+char filename[16] = {0};
 File myFile;
 
 Adafruit_BMP280 bmp; // I2C
@@ -61,6 +64,7 @@ float velocity;
 
 float raw_altitude;
 float altitude;
+
 
 size_t enterApogee; // millis at change to apogee state
 
@@ -169,12 +173,7 @@ float velocity_checker() {
 
 /*
 0 = idle = altitude less than 30 m
-1
-int stateMachine()
-{
-return 0;
-}
- = ascending = velocity > 5 m/s
+1 = ascending = velocity > 5 m/s
 2 = apogee = 5 sec
 3 = descending = velocity < -5 m/s
 4 = landed = altitude less than 30 m
@@ -287,7 +286,6 @@ void writeToFile() {
   myFile = SD.open("test.txt", FILE_WRITE);
   if (myFile) // it opened OK
     {
-    Serial.println("Writing to simple.txt");
     myFile.print(F("state = "));
     myFile.print(state);
 
@@ -311,39 +309,19 @@ void writeToFile() {
     myFile.print(altitude); /* Adjusted to local forecast! */
     myFile.println(" m");
 
-    // myFile.println("1");
-    // myFile.println(pangram_2);
-    // myFile.println(pangram_3);
     myFile.close(); 
     }
   else 
     Serial.println("Error opening simple.txt");
 }
 
-
-/*
-// put function declarations here:
-float altitude;
-Chrono altimeterTimer;
-
-MS5607 altimeter(&altitude);
-
-
-void setup() {
-  Serial.begin(115200);//initialize serial communication
-  Serial.println("Hello from the setup");
-  Serial.print(F("\tSDA = ")); Serial.println(SDA);
-  Serial.print(F("\tSCL = ")); Serial.println(SCL);
-  altimeter.begin();
-}
-
-
-void loop() {
-
-  if (altimeter.handleAltimeter() == 1) {
-    Serial.println(altitude);
-  }
-
-}
-
-*/
+// std::string GetFilenameByCurrentDate(const char* extension=".txt") {
+//     // Get the current time
+//     auto now = std::chrono::system_clock::now();
+//     // Convert to local time
+//     auto localTime = std::chrono::system_clock::to_time_t(now);
+//     // Format the timestamp as a string
+//     std::stringstream ss;
+//     ss << std::put_time(std::localtime(&localTime), "%F_%H-%M-%S") << extension;
+//     return ss.str();
+// }
