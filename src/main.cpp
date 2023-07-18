@@ -4,6 +4,7 @@
 //#include <iostream>
 #include <SPI.h>
 #include <SD.h>
+#include <RTClib.h>
 
 
 
@@ -35,10 +36,13 @@
 // CHECK before Launch !!!
 #define FLINTERING_SIZE 10
 #define APOGEE_DURATION 4000
+#define ARM_ALTITUDE 30
+#define APOGEE_VELOCITY 5.0
 
 // SD card file name
-char filename[16] = {0};
+char filename[50] = {0};
 File myFile;
+RTC_DS3231 rtc;
 
 Adafruit_BMP280 bmp; // I2C
 //Adafruit_BMP280 bmp(BMP_CS); // hardware SPI
@@ -52,6 +56,7 @@ float velocity_checker();
 int stateMachine();
 void SD_Setup();
 void writeToFile();
+String setFileName();
 
 float groundPressure;
 
@@ -72,6 +77,7 @@ size_t enterApogee; // millis at change to apogee state
 // float pressure = bmp.readPressure();
 
 void setup() {
+  Serial.begin(115200);
   altimeter();
   SD_Setup();
 }
@@ -82,6 +88,9 @@ void loop() {
   // it blocks until measurement is complete
   if (bmp.takeForcedMeasurement()) {
     // can now print out the new measurements
+
+
+    // Consider putting EVERYTHING in the state machine
 
     Serial.print(F("state = "));
     Serial.print(state);
@@ -100,11 +109,18 @@ void loop() {
 
     Serial.print(F("/ raw altitude = "));
     Serial.print(raw_altitude); /* Adjusted to local forecast! */
-    Serial.println(" m");
+    Serial.print(" m");
 
-    Serial.print(F("/ filtered altitude = "));
+    Serial.print(F("/ altitude = "));
     Serial.print(altitude); /* Adjusted to local forecast! */
-    Serial.println(" m");
+    Serial.print(" m");
+
+    Serial.print(F("/ virtical velocity = "));
+    Serial.print(velocity); /* Adjusted to local forecast! */
+    Serial.print(" m/s");
+    
+    Serial.println();
+    Serial.println();
 
     altitude_index = i % FLINTERING_SIZE; 
     i++;
@@ -113,7 +129,7 @@ void loop() {
     save_filtered_altitude();
     velocity_checker();
     state = stateMachine();
-    Serial.println();
+  
     writeToFile();
 
     delay(100);
@@ -126,7 +142,6 @@ void loop() {
 }
 
 void altimeter() {
-  Serial.begin(115200);
   Serial.println(F("BMP280 Forced Mode Test."));
 
   //if (!bmp.begin(BMP280_ADDRESS_ALT, BMP280_CHIPID)) {
@@ -143,7 +158,9 @@ void altimeter() {
                   Adafruit_BMP280::FILTER_X16,      /* Filtering. */
                   Adafruit_BMP280::STANDBY_MS_500); /* Standby time. */
 
+  // can take multiple readings and get the average
   groundPressure = (bmp.readPressure() / (100));
+  // setFileName();
 }
 
 float* save_raw_altitude() {
@@ -184,9 +201,15 @@ int state = 0;
 int stateMachine() {
 
   //idle = 0
+
+
+  
   while (state == 0){
-    if (altitude > 30.0) {
+    
+    // arming altitude
+    if (altitude > ARM_ALTITUDE) {
       state++;
+      // record what time you launch at
     }
     else {
       return state;
@@ -194,8 +217,10 @@ int stateMachine() {
   }
   //ascending = 1
   while (state == 1){
-    if (velocity < 5.0) {
+    if (velocity < APOGEE_VELOCITY) {
+      //consider changing state++ to state = .....
       state++;
+      //subtract launch time from millis to get actual apogee time
       enterApogee = millis();
     }
     else {
@@ -217,7 +242,7 @@ int stateMachine() {
 
   //descending = 3
   while (state == 3){
-    if (altitude < 30.0) {
+    if (altitude < ARM_ALTITUDE) {
       state++;
     }
     else {
@@ -229,6 +254,7 @@ int stateMachine() {
     //rocket is landed
     return state;
   }
+  return state;
 }
 
 
@@ -236,7 +262,6 @@ int stateMachine() {
 // SDcard setting
 
 void SD_Setup(){
-  Serial.begin(115200);
   SD.begin(SD_CARD_CS);
     Serial.print("Initializing SD card...");
   if (!SD.begin(SD_CARD_CS)) {
@@ -244,6 +269,7 @@ void SD_Setup(){
     while (1);
   }
   Serial.println("SD card initialised.");
+  Serial.println(filename);
 
 // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
@@ -252,10 +278,10 @@ void SD_Setup(){
 
   if (myFile) {
   Serial.print("Writing to test.txt...");
-  myFile.println("testing 1, 2, 3.");
+  myFile.println("millis,state,temp,pressure,raw_altitude,altitude,velocity");
 
   // close the file:
-  // myFile.close();
+   myFile.close();
   // Serial.println("done.");
 
   } else {
@@ -286,28 +312,26 @@ void writeToFile() {
   myFile = SD.open("test.txt", FILE_WRITE);
   if (myFile) // it opened OK
     {
-    myFile.print(F("state = "));
-    myFile.print(state);
-
-    myFile.print(F("  / Micro = "));
     myFile.print(millis());
-    myFile.print(" mSec    ");
+    myFile.print(",");
 
-    myFile.print(F("/ Temperature = "));
+    myFile.print(state);
+    myFile.print(",");
+
     myFile.print(bmp.readTemperature());
-    myFile.print(" *C    ");
+    myFile.print(",");
 
-    myFile.print(F("/Pressure = "));
     myFile.print(bmp.readPressure());
-    myFile.print(" Pa    ");
+    myFile.print(",");
 
-    myFile.print(F("/ raw altitude = "));
     myFile.print(raw_altitude); /* Adjusted to local forecast! */
-    myFile.println(" m");
+    myFile.print(",");
 
-    myFile.print(F("/ filtered altitude = "));
     myFile.print(altitude); /* Adjusted to local forecast! */
-    myFile.println(" m");
+    myFile.print(",");
+
+    myFile.print(velocity); /* Adjusted to local forecast! */
+    myFile.print("\n");
 
     myFile.close(); 
     }
@@ -325,3 +349,20 @@ void writeToFile() {
 //     ss << std::put_time(std::localtime(&localTime), "%F_%H-%M-%S") << extension;
 //     return ss.str();
 // }
+
+
+String setFileName() {
+  // Set the time
+  DateTime now = rtc.now();
+  int year = now.year();
+  int month = now.month();
+  int day = now.day();
+  int second = now.second();
+  int minute = now.minute();
+  int hour = now.hour();
+
+  snprintf(filename, 50, "%d-%02d-%02d-%02d-%02d-%02d.csv", year, month, day, hour, minute, second);
+
+  return filename;
+}
+    
