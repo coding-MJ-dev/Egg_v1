@@ -37,12 +37,12 @@
 #define FLINTERING_SIZE 10
 #define APOGEE_DURATION 4000
 #define ARM_ALTITUDE 30
-#define APOGEE_VELOCITY 5.0
+#define APOGEE_VELOCITY 0.5
 
 // SD card file name
 char filename[50] = {0};
 File myFile;
-RTC_DS3231 rtc;
+// RTC_DS3231 rtc;
 
 Adafruit_BMP280 bmp; // I2C
 //Adafruit_BMP280 bmp(BMP_CS); // hardware SPI
@@ -108,15 +108,15 @@ void loop() {
     Serial.print(" Pa    ");
 
     Serial.print(F("/ raw altitude = "));
-    Serial.print(raw_altitude); /* Adjusted to local forecast! */
+    Serial.print(raw_altitude);
     Serial.print(" m");
 
     Serial.print(F("/ altitude = "));
-    Serial.print(altitude); /* Adjusted to local forecast! */
+    Serial.print(altitude); 
     Serial.print(" m");
 
     Serial.print(F("/ virtical velocity = "));
-    Serial.print(velocity); /* Adjusted to local forecast! */
+    Serial.print(velocity); 
     Serial.print(" m/s");
     
     Serial.println();
@@ -179,7 +179,7 @@ float altitude_filter() {
 }
 
 float* save_filtered_altitude() {
-  filtered_altitude_array[altitude_index] = altitude_filter();
+  filtered_altitude_array[altitude_index] = altitude;
   return filtered_altitude_array;
 }
 
@@ -201,14 +201,10 @@ int state = 0;
 int stateMachine() {
 
   //idle = 0
-
-
-  
   while (state == 0){
-    
     // arming altitude
     if (altitude > ARM_ALTITUDE) {
-      state++;
+      state = 1;
       // record what time you launch at
     }
     else {
@@ -219,7 +215,7 @@ int stateMachine() {
   while (state == 1){
     if (velocity < APOGEE_VELOCITY) {
       //consider changing state++ to state = .....
-      state++;
+      state = 2;
       //subtract launch time from millis to get actual apogee time
       enterApogee = millis();
     }
@@ -233,7 +229,7 @@ int stateMachine() {
     // drogue, or main parachuate ejection
     size_t maintainApogee = millis();
     if (maintainApogee > enterApogee + APOGEE_DURATION) {
-      state++;
+      state = 3;
     }
     else {
       return state;
@@ -243,7 +239,7 @@ int stateMachine() {
   //descending = 3
   while (state == 3){
     if (altitude < ARM_ALTITUDE) {
-      state++;
+      state = 4;
     }
     else {
       return state;
@@ -267,49 +263,38 @@ void SD_Setup(){
   if (!SD.begin(SD_CARD_CS)) {
     Serial.println("SD initialization failed!");
     while (1);
-  }
-  Serial.println("SD card initialised.");
-  Serial.println(filename);
+    
 
-// open the file. note that only one file can be open at a time,
-  // so you have to close this one before opening another.
-  myFile = SD.open("test.txt", FILE_WRITE);
+  }
+  else{
+    Serial.println("SD card initialised.");
+    // Serial.println(filename);
+
+    // open the file. note that only one file can be open at a time,
+    // so you have to close this one before opening another.
+    myFile = SD.open("flight_data.txt", FILE_WRITE);
   // if the file opened okay, write to it:
 
-  if (myFile) {
-  Serial.print("Writing to test.txt...");
-  myFile.println("millis,state,temp,pressure,raw_altitude,altitude,velocity");
+    if (myFile) {
+    Serial.print("Writing to flight_data.txt...");
+    myFile.println("millis,state,temp,pressure,raw_altitude,altitude,velocity");
 
-  // close the file:
-   myFile.close();
-  // Serial.println("done.");
+    // close the file:
+    myFile.close();
+    // Serial.println("done.");
 
-  } else {
-  // if the file didn't open, print an error:
-  Serial.println("error opening test.txt");
+    } else {
+    // if the file didn't open, print an error:
+    Serial.println("error opening flight_data.txt");
+    }
   }
 
-
-  // re-open the file for reading:
-  // myFile = SD.open("test.txt");
-  // if (myFile) {
-  //   Serial.println("test.txt:");
-   // read from the file until there's nothing else in it:
-    // while (myFile.available()) {
-    //   Serial.write(myFile.read());
-    // }
-    // close the file:
-    // myFile.close();
-  // } else {
-  //   // if the file didn't open, print an error:
-  //   Serial.println("error opening test.txt");
-  // }
 }
 
 
 void writeToFile() {
   Serial.begin(115200);
-  myFile = SD.open("test.txt", FILE_WRITE);
+  myFile = SD.open("flight_data.txt", FILE_WRITE);
   if (myFile) // it opened OK
     {
     myFile.print(millis());
@@ -339,30 +324,19 @@ void writeToFile() {
     Serial.println("Error opening simple.txt");
 }
 
-// std::string GetFilenameByCurrentDate(const char* extension=".txt") {
-//     // Get the current time
-//     auto now = std::chrono::system_clock::now();
-//     // Convert to local time
-//     auto localTime = std::chrono::system_clock::to_time_t(now);
-//     // Format the timestamp as a string
-//     std::stringstream ss;
-//     ss << std::put_time(std::localtime(&localTime), "%F_%H-%M-%S") << extension;
-//     return ss.str();
+
+// String setFileName() {
+//   // Set the time
+//   DateTime now = rtc.now();
+//   int year = now.year();
+//   int month = now.month();
+//   int day = now.day();
+//   int second = now.second();
+//   int minute = now.minute();
+//   int hour = now.hour();
+
+//   snprintf(filename, 50, "%d-%02d-%02d-%02d-%02d-%02d.csv", year, month, day, hour, minute, second);
+
+//   return filename;
 // }
-
-
-String setFileName() {
-  // Set the time
-  DateTime now = rtc.now();
-  int year = now.year();
-  int month = now.month();
-  int day = now.day();
-  int second = now.second();
-  int minute = now.minute();
-  int hour = now.hour();
-
-  snprintf(filename, 50, "%d-%02d-%02d-%02d-%02d-%02d.csv", year, month, day, hour, minute, second);
-
-  return filename;
-}
     
