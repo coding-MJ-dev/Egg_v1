@@ -31,7 +31,7 @@
 #define BMP_MISO (12)
 #define BMP_MOSI (11)
 #define BMP_CS   (10)
-#define SD_CARD_CS 9
+#define SD_CARD_CS 10
 
 // CHECK before Launch !!!
 #define FLINTERING_SIZE 10
@@ -92,8 +92,9 @@ void loop() {
 
     // Consider putting EVERYTHING in the state machine
 
-    Serial.print(F("state = "));
+    Serial.print(F("state ="));
     Serial.print(state);
+     Serial.print(F(","));
 
     Serial.print(F("  / Micro = "));
     Serial.print(millis());
@@ -272,11 +273,11 @@ void SD_Setup(){
 
     // open the file. note that only one file can be open at a time,
     // so you have to close this one before opening another.
-    myFile = SD.open("flight_data.txt", FILE_WRITE);
+    myFile = SD.open("test.txt", FILE_WRITE);
   // if the file opened okay, write to it:
 
     if (myFile) {
-    Serial.print("Writing to flight_data.txt...");
+    Serial.print("Writing to test.txt...");
     myFile.println("millis,state,temp,pressure,raw_altitude,altitude,velocity");
 
     // close the file:
@@ -285,7 +286,7 @@ void SD_Setup(){
 
     } else {
     // if the file didn't open, print an error:
-    Serial.println("error opening flight_data.txt");
+    Serial.println("error opening test.txt");
     }
   }
 
@@ -294,7 +295,7 @@ void SD_Setup(){
 
 void writeToFile() {
   Serial.begin(115200);
-  myFile = SD.open("flight_data.txt", FILE_WRITE);
+  myFile = SD.open("test.txt", FILE_WRITE);
   if (myFile) // it opened OK
     {
     myFile.print(millis());
