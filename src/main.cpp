@@ -86,7 +86,7 @@ void setup() {
 void loop() {
   // must call this to wake sensor up and get new measurement data
   // it blocks until measurement is complete
-  if (bmp.takeForcedMeasurement()) {
+  //if (bmp.takeForcedMeasurement()) {
     // can now print out the new measurements
 
 
@@ -94,7 +94,7 @@ void loop() {
 
     Serial.print(F("state ="));
     Serial.print(state);
-     Serial.print(F(","));
+    Serial.print(F(","));
 
     Serial.print(F("  / Micro = "));
     Serial.print(millis());
@@ -135,15 +135,15 @@ void loop() {
 
     delay(100);
 
-  } else {
-    Serial.println("Forced measurement failed!");
-  }
+  // } else {
+  //   Serial.println("Forced measurement failed!");
+  // }
 
 
 }
 
 void altimeter() {
-  Serial.println(F("BMP280 Forced Mode Test."));
+  Serial.println(F("BMP280 Test."));
 
   //if (!bmp.begin(BMP280_ADDRESS_ALT, BMP280_CHIPID)) {
   if (!bmp.begin(0x76)) {
@@ -153,11 +153,11 @@ void altimeter() {
   }
 
   /* Default settings from datasheet. */
-  bmp.setSampling(Adafruit_BMP280::MODE_FORCED,     /* Operating Mode. */
+  bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,     /* Operating Mode. */
                   Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
                   Adafruit_BMP280::SAMPLING_X16,    /* Pressure oversampling */
                   Adafruit_BMP280::FILTER_X16,      /* Filtering. */
-                  Adafruit_BMP280::STANDBY_MS_500); /* Standby time. */
+                  Adafruit_BMP280::STANDBY_MS_250); /* Standby time. */
 
   // can take multiple readings and get the average
   groundPressure = (bmp.readPressure() / (100));
