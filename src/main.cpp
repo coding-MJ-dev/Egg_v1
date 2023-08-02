@@ -5,7 +5,7 @@
 #include <SPI.h>
 #include <SD.h>
 #include <RTClib.h>
-
+#include <SimpleKalmanFilter.h>
 
 
 /***************************************************************************
@@ -48,6 +48,14 @@ Adafruit_BMP280 bmp; // I2C
 //Adafruit_BMP280 bmp(BMP_CS); // hardware SPI
 //Adafruit_BMP280 bmp(BMP_CS, BMP_MOSI, BMP_MISO,  BMP_SCK);
 
+/*
+ SimpleKalmanFilter(e_mea, e_est, q);
+ e_mea: Measurement Uncertainty 
+ e_est: Estimation Uncertainty 
+ q: Process Noise
+ */
+SimpleKalmanFilter pressureKalmanFilter(2, 2, 0.01);
+
 void altimeter();
 float* save_raw_altitude();
 float altitude_filter();
@@ -59,9 +67,11 @@ void writeToFile();
 String setFileName();
 
 float groundPressure;
+float estimated_altitude;
 
 int i = 0;
-int altitude_index; 
+int altitude_index;
+int velocity_index = 0;
 int state = 0;
 float altitude_array[FLINTERING_SIZE];
 float filtered_altitude_array[FLINTERING_SIZE];
@@ -80,6 +90,7 @@ void setup() {
   Serial.begin(115200);
   altimeter();
   SD_Setup();
+  
 }
 
 
@@ -88,49 +99,56 @@ void loop() {
   // it blocks until measurement is complete
   //if (bmp.takeForcedMeasurement()) {
     // can now print out the new measurements
-
-
+    Serial.begin(115200);
+    
     // Consider putting EVERYTHING in the state machine
 
-    Serial.print(F("state ="));
-    Serial.print(state);
-    Serial.print(F(","));
+    // Serial.print(F("state:"));
+    // Serial.print(state);
+    // Serial.print(F(","));
 
-    Serial.print(F("  / Micro = "));
-    Serial.print(millis());
-    Serial.print(" mSec    ");
+    // Serial.print(F("Micro:"));
+    // Serial.print(millis());
+    // Serial.print(",");
 
-    Serial.print(F("/ Temperature = "));
-    Serial.print(bmp.readTemperature());
-    Serial.print(" *C    ");
+    // Serial.print(F("Temperature:"));
+    // Serial.print(bmp.readTemperature());
+    // Serial.print(",");
 
-    Serial.print(F("/Pressure = "));
-    Serial.print(bmp.readPressure());
-    Serial.print(" Pa    ");
+    // Serial.print(F("Pressure:"));
+    // Serial.print(bmp.readPressure());
+    // Serial.print(",");
 
-    Serial.print(F("/ raw altitude = "));
+    Serial.print(("raw_altitude:"));
     Serial.print(raw_altitude);
-    Serial.print(" m");
+    Serial.print(",");
 
-    Serial.print(F("/ altitude = "));
+    Serial.print(F("flitered_altitude:"));
     Serial.print(altitude); 
-    Serial.print(" m");
+    Serial.print(",");
 
-    Serial.print(F("/ virtical velocity = "));
-    Serial.print(velocity); 
-    Serial.print(" m/s");
+    Serial.print(("estimated_altitude:"));
+    Serial.print(estimated_altitude); 
+
+
+    // Serial.print(F("virtical velocity:"));
+    // Serial.print(velocity); 
     
     Serial.println();
     Serial.println();
 
-    altitude_index = i % FLINTERING_SIZE; 
+    altitude_index = i % FLINTERING_SIZE;
+    velocity_index = i % 2;
     i++;
     save_raw_altitude();
     altitude_filter();
     save_filtered_altitude();
+    estimated_altitude = pressureKalmanFilter.updateEstimate(raw_altitude);
     velocity_checker();
     state = stateMachine();
-  
+    
+
+    
     writeToFile();
 
     delay(100);
@@ -162,6 +180,7 @@ void altimeter() {
   // can take multiple readings and get the average
   groundPressure = (bmp.readPressure() / (100));
   // setFileName();
+  
 }
 
 float* save_raw_altitude() {
@@ -169,6 +188,7 @@ float* save_raw_altitude() {
   altitude_array[altitude_index] = raw_altitude;
   return altitude_array;
 }
+
 
 float altitude_filter() {
   float sum_altitude = 0;
@@ -180,12 +200,12 @@ float altitude_filter() {
 }
 
 float* save_filtered_altitude() {
-  filtered_altitude_array[altitude_index] = altitude;
+  filtered_altitude_array[velocity_index] = altitude;
   return filtered_altitude_array;
 }
 
 float velocity_checker() {
-  velocity = ((filtered_altitude_array[altitude_index] - filtered_altitude_array[(altitude_index - 1 + FLINTERING_SIZE) % 10]));
+  velocity = ((filtered_altitude_array[velocity_index] - filtered_altitude_array[(velocity_index + 1) % 2]));
   return velocity;
 }
 
@@ -326,18 +346,4 @@ void writeToFile() {
 }
 
 
-// String setFileName() {
-//   // Set the time
-//   DateTime now = rtc.now();
-//   int year = now.year();
-//   int month = now.month();
-//   int day = now.day();
-//   int second = now.second();
-//   int minute = now.minute();
-//   int hour = now.hour();
 
-//   snprintf(filename, 50, "%d-%02d-%02d-%02d-%02d-%02d.csv", year, month, day, hour, minute, second);
-
-//   return filename;
-// }
-    
