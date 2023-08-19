@@ -16,7 +16,7 @@ Adafruit_BMP280 bmp; // I2C
 #define BMP_CS   (10)
 
 //KalmanFilter
-SimpleKalmanFilter pressureKalmanFilter(2, 2, 0.01);
+SimpleKalmanFilter pressureKalmanFilter(5, 5, 5);
 
 
 void Altimeter::altimeterSetup() {
