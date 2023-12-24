@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <SD.h>
-// #include <string>
 #include <Adafruit_BMP280.h>
 #include "altimeter.hpp"
 #include "state.hpp"
