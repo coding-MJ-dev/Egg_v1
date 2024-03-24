@@ -2,14 +2,21 @@
 
 # Project Egg
 : First rocket flight computer (Avionics) build from scratch
+
 : Every components soldered on the breadboard by hand
+
 : C++ / C project
+
 : It has had mutliple prototype test and one actual flight with Midium power rocket made by myself.
+
 
 ## state machine ##
 : state machine Based on collected flight data
+
 : Using KalmanFilter to idealize the data
+
 : it is consisted of 5 state
+
 
 0. idle
 1. ascending
@@ -36,7 +43,7 @@ https://www.snapeda.com/parts/MEM2051-00-195-00-A/Global%20Connector%20Technolog
 
 ## Tool ##
 1. VS code
-2. Platform IO
+3. Platform IO
 
 
 
