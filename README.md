@@ -1,4 +1,7 @@
 ![egg](https://github.com/coding-MJ-dev/Egg_v1/assets/127004932/cc6463a0-664a-4847-83ed-a396d221f568)
+![image](https://github.com/user-attachments/assets/0dd27ce8-730e-4323-9cc4-69b8d50dca80)
+
+
 
 # Project Egg
 : First rocket flight computer (Avionics) built from scratch
